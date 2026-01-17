@@ -1,21 +1,21 @@
-from fastapi import Header, HTTPException
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from itsdangerous import URLSafeSerializer
-import hashlib
-import hmac
-import os
-import secrets
+import hashlib, hmac, os, secrets
 
 SECRET = os.environ.get("AFTERME_AUTH_SECRET", "dev-secret-change-me")
 serializer = URLSafeSerializer(SECRET, salt="afterme-auth")
+
+security = HTTPBearer(auto_error=False)
 PASSWORD_ITERATIONS = 120_000
 
 def make_token(user_id: int) -> str:
     return serializer.dumps({"user_id": user_id})
 
-def require_user_id(authorization: str | None = Header(default=None)) -> int:
-    if not authorization or not authorization.startswith("Bearer "):
+def require_user_id(creds: HTTPAuthorizationCredentials = Depends(security)) -> int:
+    if creds is None or creds.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="Missing Bearer token")
-    token = authorization.split(" ", 1)[1]
+    token = creds.credentials
     try:
         data = serializer.loads(token)
         return int(data["user_id"])
