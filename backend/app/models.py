@@ -8,6 +8,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(255))
+    password_salt: Mapped[str] = mapped_column(String(64))
+    password_hash: Mapped[str] = mapped_column(String(128))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     policies = relationship("WillPolicy", back_populates="owner")

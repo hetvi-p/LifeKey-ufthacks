@@ -1,10 +1,15 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Literal, Optional, List
 from datetime import datetime
 
 class LoginIn(BaseModel):
     email: EmailStr
-    name: str
+    password: str = Field(min_length=8)
+
+class RegisterIn(BaseModel):
+    email: EmailStr
+    name: str = Field(min_length=1)
+    password: str = Field(min_length=8)
 
 class LoginOut(BaseModel):
     token: str
