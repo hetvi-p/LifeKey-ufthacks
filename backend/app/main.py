@@ -1,8 +1,8 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from .db import Base, engine, get_db
 from . import models, schemas
-from .auth import make_token
+from .auth import hash_password, make_token, verify_password
 from .routes import policies, recipients, vault_items, assignments, claims, releases
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -18,14 +18,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.post("/auth/register", response_model=schemas.LoginOut, tags=["auth"])
+def register(body: schemas.RegisterIn, db: Session = Depends(get_db)):
+    existing = db.query(models.User).filter(models.User.email == str(body.email)).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Email already registered")
+    salt, password_hash = hash_password(body.password)
+    user = models.User(
+        email=str(body.email),
+        name=body.name,
+        password_salt=salt,
+        password_hash=password_hash,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return schemas.LoginOut(token=make_token(user.id), user_id=user.id)
+
 @app.post("/auth/login", response_model=schemas.LoginOut, tags=["auth"])
 def login(body: schemas.LoginIn, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == str(body.email)).first()
-    if not user:
-        user = models.User(email=str(body.email), name=body.name)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+    if not user or not verify_password(body.password, user.password_salt, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
     return schemas.LoginOut(token=make_token(user.id), user_id=user.id)
 
 # Routers
